@@ -396,8 +396,8 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .dp-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .dp-foot button{border:0;background:none;color:var(--a);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;padding:6px 8px;border-radius:8px}
 .dp-foot button:hover{background:var(--a2)}
-
-/* =====================================================================
+</style>
+<style id="skinA">/* =====================================================================
    TEACHER PLANNER — skin A, "Calm classroom"
    Layered on top of kit.css. Same app, same 24 modules, same tests.
    Warm paper, soft white cards without hairlines, one sage accent with an
@@ -874,9 +874,12 @@ function migrate(){
 
 /* ---- theme ---- */
 function applyTheme(){
-  var h = document.documentElement;
-  h.setAttribute('data-mode', DB.settings.mode || 'dark');
+  var h = document.documentElement, s = skin();
+  h.setAttribute('data-skin', s);
+  var st = el('skinA'); if(st) st.disabled = (s !== 'A');
+  h.setAttribute('data-mode', DB.settings.mode || 'light');
   h.setAttribute('data-accent', DB.settings.accent || 'teal');
+  try{ var tc = document.querySelector('meta[name=theme-color]'); if(tc) tc.setAttribute('content', getComputedStyle(h).getPropertyValue('--ground').trim() || '#F6F1E8'); }catch(e){}
   var m = el('mode'); if(m) m.innerHTML = ic(DB.settings.mode==='light' ? 'moon' : 'sun');   /* the button shows where you are going */
 }
 
@@ -916,7 +919,8 @@ function switchView(id){
   render();
   window.scrollTo(0,0);
 }
-var SKIN = document.documentElement.getAttribute('data-skin') || 'B';   /* A = calm classroom, B = command center */
+/* the look: A = calm classroom (kit-A.css on), B = command centre (kit-A.css off). A setting, not a build. */
+function skin(){ return DB && DB.settings && DB.settings.skin ? DB.settings.skin : (document.documentElement.getAttribute('data-skin') || 'A'); }
 function paintHead(){
   var m = mod(VIEW); if(!m) return;
   var cap = typeof m.cap === 'function' ? m.cap() : (m.cap || '');
@@ -1437,7 +1441,7 @@ function paintStatus(){
 
 function blank(){
   return {
-    settings: { mode:'light', accent:'teal', setup:false, activeClass:'', yearStart:'', yearEnd:'',
+    settings: { skin:'A', mode:'light', accent:'teal', setup:false, activeClass:'', yearStart:'', yearEnd:'',
                 gradeScale:[['A',90],['B',80],['C',70],['D',60],['F',0]], lastBackup:null },
     teacher: { name:'', first:'', school:'', role:'', room:'', email:'', phone:'' },
     periods: [
@@ -1750,13 +1754,13 @@ reg({
       tile('var(--a)','var(--a2)','users','Students', students, 'across '+plural(DB.classes.length,'class','classes')) +
       tile('var(--violet)','var(--violet2)','check','Attendance today', attRate===null?'—':attRate+'%', marked ? '<b class="bad">'+a+' absent</b> · '+l+' late' : 'not taken yet') +
       tile('var(--bad)','var(--bad2)','check','Tasks due', dueToday.length+'<small>/ '+open.length+'</small>', 'today / open') +
-      (SKIN==='A' ? tile('var(--warm)','var(--warm2)','cal','This week', week, plural(week,'event')) + tile('var(--blue)','var(--blue2)','layers','Classes today', classesToday, 'on the timetable')
+      (skin()==='A' ? tile('var(--warm)','var(--warm2)','cal','This week', week, plural(week,'event')) + tile('var(--blue)','var(--blue2)','layers','Classes today', classesToday, 'on the timetable')
                   : tile('var(--warm)','var(--warm2)','heart','Support plans', plans.length, overdue?'<b class="warm">'+overdue+' review overdue</b>':'all reviews on time') + tile('var(--blue)','var(--blue2)','chart','Class average', avg===null?'—':avg+'%', 'across graded work')) +
       '</div>';
 
     /* today: the day bar (B) or the vertical timeline (A) */
     var today;
-    if(SKIN==='A'){
+    if(skin()==='A'){
       today = '<section class="panel"><div class="ch"><p class="lab">Today\u2019s schedule</p><button class="linkbtn" data-go="planner">Open planner \u2192</button></div><div class="tl">' + schedule().map(function(r){
         var pd = r.period, tag = r.state==='now' ? 'Now' : (r.state==='next' ? 'Next' : '');
         var cls = r.state==='now' ? 'now' : r.state==='past' ? 'past' : '';
@@ -1815,7 +1819,7 @@ reg({
       }).join('') : '<p class="empty">Nothing coming up.</p>') + '</section>';
 
     var h;
-    if(SKIN==='A'){
+    if(skin()==='A'){
       /* the calm-classroom layout: the day down the left, the rest stacked on the right */
       h = kpi + '<div class="grid dashA"><div class="col">'+today+tasks+'</div><div class="col">'+bday+quick+classes+attention+'</div></div>';
     } else {
@@ -3513,7 +3517,9 @@ reg({
     v.innerHTML = '<div class="grid">' +
       '<section class="panel"><div class="ch"><p class="lab">You</p><button class="btn sm" id="editTeacher">'+ic('edit',14)+'Edit</button></div>' +
         kvRow('Name', DB.teacher.name)+kvRow('School', DB.teacher.school)+kvRow('Room', DB.teacher.room)+kvRow('Teaching', DB.teacher.role)+kvRow('E-mail', DB.teacher.email)+kvRow('Phone', DB.teacher.phone)+'</section>' +
-      '<section class="panel"><div class="ch"><p class="lab">Appearance</p></div><div class="field"><label>Mode</label><div class="seg"><button data-mode-set="dark"'+(DB.settings.mode==='dark'?' class="on"':'')+'>Dark</button><button data-mode-set="light"'+(DB.settings.mode==='light'?' class="on"':'')+'>Light</button></div></div>' +
+      '<section class="panel"><div class="ch"><p class="lab">Appearance</p></div>' +
+        '<div class="field"><label>Look</label><div class="seg"><button data-skin-set="A"'+(skin()==='A'?' class="on"':'')+'>Calm classroom</button><button data-skin-set="B"'+(skin()==='B'?' class="on"':'')+'>Command centre</button></div><div class="hint">Same planner, same data - a different coat of paint. Switch any time.</div></div>' +
+        '<div class="field"><label>Mode</label><div class="seg"><button data-mode-set="dark"'+(DB.settings.mode==='dark'?' class="on"':'')+'>Dark</button><button data-mode-set="light"'+(DB.settings.mode==='light'?' class="on"':'')+'>Light</button></div></div>' +
         '<div class="field"><label>Accent</label><div class="chips">'+['teal','amber','violet','blue','pink'].map(function(a){ return '<button class="chip'+(DB.settings.accent===a?' on':'')+'" data-accent-set="'+a+'">'+a+'</button>'; }).join('')+'</div></div></section>' +
       '<section class="panel full"><div class="ch"><p class="lab">The school day</p></div><div class="tbl"><table><thead><tr><th>Period</th><th>Starts</th><th>Ends</th><th>What fills it</th></tr></thead><tbody>' +
         DB.periods.map(function(p){ var c = classFor(p.n); return '<tr><td><b>'+esc(p.label)+'</b></td><td>'+pickHtml('ps'+p.n,'time',p.start,'data-ps="'+p.n+'"',132)+'</td><td>'+pickHtml('pe'+p.n,'time',p.end,'data-pe="'+p.n+'"',132)+'</td><td>'+(p.n===-1?'<span class="muted">Lunch</span>':c?'<span class="sw" style="background:'+c.colour+'"></span> '+esc(c.name):'<input data-free="'+p.n+'" value="'+esc(DB.free[p.n]||'')+'" placeholder="Planning, duty, free…" class="inp" style="width:100%">')+'</td></tr>'; }).join('') +
@@ -3529,11 +3535,12 @@ reg({
   wire: function(){
     var v = el('v-settings');
     v.addEventListener('click', function(e){
-      var t = e.target.closest ? e.target.closest('[data-mode-set],[data-accent-set],[data-gs-preset],[data-gs-x],[data-help],#gsAdd,#editTeacher,#backupBtn,#restoreBtn,#demoBtn,#resetBtn') : null; if(!t) return;
+      var t = e.target.closest ? e.target.closest('[data-skin-set],[data-mode-set],[data-accent-set],[data-gs-preset],[data-gs-x],[data-help],#gsAdd,#editTeacher,#backupBtn,#restoreBtn,#demoBtn,#resetBtn') : null; if(!t) return;
       if(t.hasAttribute('data-gs-preset')){ DB.settings.gradeScale = GS_PRESETS[+t.getAttribute('data-gs-preset')][1].map(function(g){ return [g[0], g[1]]; }); render(); toast('Grade scale set.'); return; }
       if(t.hasAttribute('data-gs-x')){ DB.settings.gradeScale.splice(+t.getAttribute('data-gs-x'), 1); render(); return; }
       if(t.id==='gsAdd'){ DB.settings.gradeScale.push(['', 0]); render(); var last = document.querySelector('#gsRows .gsrow:last-child input'); if(last) last.focus(); return; }
       if(t.hasAttribute('data-help')){ helpSheet(t.getAttribute('data-help')); return; }
+      if(t.hasAttribute('data-skin-set')){ DB.settings.skin = t.getAttribute('data-skin-set'); paintStatus(); render(); return; }
       if(t.hasAttribute('data-mode-set')){ DB.settings.mode = t.getAttribute('data-mode-set'); render(); return; }
       if(t.hasAttribute('data-accent-set')){ DB.settings.accent = t.getAttribute('data-accent-set'); render(); return; }
       if(t.id==='editTeacher'){ openForm({ title:'About you', fields:[{key:'name',label:'Name',req:true},{key:'school',label:'School',opt:true},{key:'room',label:'Room',opt:true},{key:'role',label:'What you teach',opt:true},{key:'email',label:'E-mail',opt:true,type:'email'},{key:'phone',label:'Phone',opt:true,type:'tel'}] }, DB.teacher, function(x){ for(var k in x) DB.teacher[k]=x[k]; DB.teacher.first = x.name.split(' ')[0]; paintStatus(); }); return; }
@@ -3589,7 +3596,7 @@ function helpSheet(kind){
     '<li>Backup reminder on Home when it has been two weeks</li><li>A note beside any attendance mark (why they were away)</li>' +
     '<li>Copy last week in the Planner; Duplicate in the Lessons bank</li><li>"How did it go?" on any taught slot, collected under the lesson</li>' +
     '<li>Strengths, interests and notes for staff on every student - printed in the substitute pack</li><li>One-tap behaviour chips on the profile</li>' +
-    '<li>Grade scale editor: A-F, 9-1, 1-4 or your own</li><li>Checks for duplicate names and dates the wrong way round</li>' +
+    '<li>Two looks in one file: Calm classroom and Command centre, switched in Settings</li><li>Grade scale editor: A-F, 9-1, 1-4 or your own</li><li>Checks for duplicate names and dates the wrong way round</li>' +
     '<li>Keyboard focus rings and screen-reader labels throughout</li></ul>' +
     '<p class="lab" style="margin:12px 0 4px">Version 1.0</p><ul class="help"><li>First release - 24 screens, two looks, offline, one file.</li></ul>';
   el('hostIn').className = 'sheet-in';
