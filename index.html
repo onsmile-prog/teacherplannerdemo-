@@ -106,10 +106,18 @@ a{color:var(--a)}
 @media(max-width:639px){  /* phone: brand · clock · [mode, avatar] on one row, the live period card full width below */
   .status{gap:10px 8px;padding:10px 12px}
   .status .right{order:1;flex-wrap:nowrap}
-  .status .live{order:2;flex-basis:100%}
+  .status .live{order:2;flex:1 1 58%;min-width:0}
+  #classPick{order:3;flex:0 1 auto;max-width:160px;min-width:0}
   #schoolChip{display:none}
 }
 .chip{background:var(--card2);border:1px solid var(--hair);border-radius:99px;padding:6px 11px;font-size:11.5px;font-weight:700;color:var(--muted);white-space:nowrap;cursor:default}
+/* the class chip: a dot in the class colour, the name, a chevron - it is a button */
+.chip.cpick{cursor:pointer;display:inline-flex;align-items:center;gap:7px;color:var(--ink);padding:6px 9px 6px 10px;max-width:220px;font:inherit;font-size:11.5px;font-weight:700}
+.chip.cpick .sw{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.chip.cpick b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.cpick svg{flex-shrink:0;opacity:.7}
+.chip.cpick:hover{border-color:var(--a)}
+.att-row.on{border-color:var(--a);background:var(--a2)}
 .chip b{color:var(--ink)}
 button.chip{cursor:pointer}
 .chip.on{background:var(--a);color:var(--on-a);border-color:var(--a)}
@@ -465,6 +473,8 @@ html,body{font-size:14px;line-height:1.5}
 .live .bar{background:rgba(255,255,255,.25)} .live .bar i{background:#fff}
 .status .chip{background:rgba(255,255,255,.16);border-color:transparent;color:inherit}
 .status .chip b{color:inherit}
+.status .chip.cpick{color:inherit;background:rgba(255,255,255,.2)} .status .chip.cpick:hover{background:rgba(255,255,255,.3);border-color:transparent}
+.att-row.on{background:var(--a2)}
 .status .iconbtn{background:rgba(255,255,255,.16);border-color:transparent;color:inherit}
 .status .av{background:var(--warm);color:#fff;border-radius:50%}
 
@@ -728,6 +738,7 @@ body.dragging{user-select:none;-webkit-user-select:none}
       <div class="clock" id="clock"></div>
       <div class="live" id="live"></div>
       <div class="right">
+        <button class="chip cpick" id="classPick" aria-label="Choose the class you are working with" hidden></button>
         <span class="chip" id="schoolChip"></span>
         <button class="iconbtn" id="bellBtn" aria-label="Needs attention" title="Needs attention"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><b class="bb" id="bellCount" hidden></b></button>
         <button class="iconbtn" id="searchBtn" aria-label="Search everything" title="Search (Ctrl+K)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg></button>
@@ -911,6 +922,7 @@ function render(){
   if(m && m.render) m.render();
   paintHead();
   paintNav();
+  paintClassPick();
   save();
 }
 function switchView(id){
@@ -1115,6 +1127,40 @@ function attentionItems(){
 function alertHtml(it){
   return '<div class="alert '+it.lv+'" data-go-view="'+it.view+'" role="button" tabindex="0" style="cursor:pointer">'+ic(it.icon)+'<div><b>'+esc(it.title)+'</b><span>'+esc(it.sub)+'</span></div></div>';
 }
+/* ---- the class you are working with ------------------------------------
+   One chip in the strip, on every screen: the active class. Tap it for the
+   list; picking one switches the register, gradebook, seating, students,
+   toolkit and sub pack to that class in one go. The per-screen tabs still
+   work and keep the chip in step. */
+function paintClassPick(){
+  var b = el('classPick'); if(!b) return;
+  var c = activeClass();
+  b.hidden = !c;
+  if(c) b.innerHTML = '<span class="sw" style="background:'+c.colour+'"></span><b>'+esc(c.name)+'</b>'+ic('down', 12);
+}
+function openClassPick(){
+  var cur = activeClass();
+  var h = '<div class="ch" style="margin-bottom:10px"><h2 style="margin:0">Which class?</h2><span class="chip">'+plural(DB.classes.length,'class','classes')+'</span></div>' +
+    '<p class="muted small" style="margin:-4px 0 12px">The register, gradebook, seating, students, toolkit and substitute pack follow this.</p>' +
+    DB.classes.slice().sort(function(a,b){ return a.period-b.period; }).map(function(c){
+      var p = DB.periods.filter(function(x){ return x.n===c.period; })[0], n = studentsIn(c.id).length, on = cur && c.id===cur.id;
+      return '<button class="att-row'+(on?' on':'')+'" data-pick-class="'+c.id+'"><span class="att-ic" style="background:'+c.colour+';color:#fff">'+initials(c.name)+'</span><span class="att-t"><b>'+esc(c.name)+'</b><span>'+esc(c.subject||'')+(c.room?' \u00b7 '+esc(c.room):'')+(p?' \u00b7 '+esc(p.label)+' '+fmt12(p.start):'')+' \u00b7 '+plural(n,'student')+'</span></span>'+(on?'<span class="tag a">Active</span>':'<span class="att-go">\u2192</span>')+'</button>';
+    }).join('') +
+    '<div class="sheet-cta"><button class="btn ghost" data-close="hostSheet">Close</button><button class="btn" data-go-view="classes" data-close="hostSheet">'+ic('plus',14)+'Add a class</button></div>';
+  el('hostIn').className = 'sheet-in att';
+  el('hostIn').innerHTML = h;
+  openSheet('hostSheet');
+}
+function wireClassPick(){
+  el('classPick').addEventListener('click', openClassPick);
+  document.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('[data-pick-class]') : null; if(!t) return;
+    DB.settings.activeClass = t.getAttribute('data-pick-class'); DB.settings._stuAll = false; DB.settings._seatSel = ''; DB.settings._seatStu = '';
+    closeSheet('hostSheet'); paintStatus(); render();
+    var c = activeClass(); if(c) toast(c.name+' \u00b7 '+plural(studentsIn(c.id).length,'student'));
+  });
+}
+
 /* the bell: a count on the strip, a sheet with the whole list grouped by urgency */
 function paintBell(){
   var items = attentionItems(), b = el('bellCount'), bad = items.some(function(x){ return x.lv==='bad'; });
@@ -1427,7 +1473,7 @@ function paintStatus(){
   el('schoolChip').innerHTML = '<b>'+esc(DB.teacher.room||'')+'</b>'+(DB.teacher.school?(DB.teacher.room?' · ':'')+esc(DB.teacher.school):'');
   el('schoolChip').hidden = !(DB.teacher.room || DB.teacher.school);   /* nothing set yet: no empty pill */
   el('avatar').textContent = initials(DB.teacher.name||'T P');
-  paintBell();
+  paintBell(); paintClassPick();
   var ci = currentPeriodIndex(), ni = nextPeriodIndex(), open = DB.tasks.filter(function(t){ return !t.done; }).length;
   if(ci>=0){
     var p = DB.periods[ci], c = classFor(p.n), tot = mins(p.end)-mins(p.start), done = nm-mins(p.start);
@@ -1817,9 +1863,9 @@ reg({
 
     var classes = '<section class="panel"><div class="ch"><p class="lab">Classes</p><button class="linkbtn" data-go="gradebook">Gradebook \u2192</button></div>' +
       (DB.classes.length ? '<div class="tbl"><table><thead><tr><th>Class</th><th>Graded</th><th class="r">Avg</th></tr></thead><tbody>' +
-      DB.classes.filter(function(c){ return c.period!==0; }).map(function(c){
-        var g = classGrading(c.id), av = classAverage(c.id);
-        return '<tr><td><span class="sw" style="background:'+c.colour+'"></span> <b>'+esc(c.name)+'</b><br><span class="muted small" style="padding-left:16px">'+esc(c.room)+' \u00b7 '+studentsIn(c.id).length+'</span></td>' +
+      DB.classes.filter(function(c){ return c.period!==0; }).sort(function(a,b){ var ac = activeClass(); return (b.id===(ac&&ac.id)) - (a.id===(ac&&ac.id)); }).map(function(c){
+        var g = classGrading(c.id), av = classAverage(c.id), on = activeClass() && c.id===activeClass().id;
+        return '<tr'+(on?' style="background:var(--a2)"':'')+'><td><span class="sw" style="background:'+c.colour+'"></span> <b>'+esc(c.name)+'</b>'+(on?' <span class="tag a" style="margin-left:4px">Active</span>':'')+'<br><span class="muted small" style="padding-left:16px">'+esc(c.room)+' \u00b7 '+studentsIn(c.id).length+'</span></td>' +
           '<td style="min-width:90px"><span class="small muted">'+g.pct+'% of '+plural(g.assessments,'assessment')+'</span><div class="bar" style="margin-top:4px"><i style="width:'+g.pct+'%;background:'+c.colour+'"></i></div></td>' +
           '<td class="r"><span class="g" style="color:'+(av!==null&&av<70?'var(--warm)':'var(--ink)')+'">'+(av===null?'\u2014':av+'%')+'</span></td></tr>';
       }).join('')+'</tbody></table></div>' : '<p class="empty">No classes yet. <b>Add one</b> on the Classes screen.</p>') +
@@ -3686,7 +3732,7 @@ function boot(){
   load();
   buildShell();
   wireSheets();
-  wireForm(); wireSearch(); wirePickers(); wireAsk(); wireGo(); wireBell();
+  wireForm(); wireSearch(); wirePickers(); wireAsk(); wireGo(); wireBell(); wireClassPick();
   MODS.forEach(function(m){ if(m.wire) m.wire(); });
   paintStatus();
   switchView('dashboard');
