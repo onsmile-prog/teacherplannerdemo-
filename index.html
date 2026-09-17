@@ -1078,38 +1078,39 @@ function ask(msg, onYes, opts){
    sub, view }. bad = act now, warn = soon, ok = a reminder (birthdays). */
 function attentionItems(){
   var T = todayIso(), out = [], nm = nowMins(), dow = simToday().getDay();
-  function push(lv, icon, title, sub, view){ out.push({ lv:lv, icon:icon, title:title, sub:sub, view:view }); }
+  function push(lv, icon, title, sub, view, cid){ out.push({ lv:lv, icon:icon, title:title, sub:sub, view:view, cid:cid||'' }); }
+  function cidOf(sid){ var s = stu(sid); return s ? s.classId : ''; }
   function cname(s){ return (cls(s.classId)||{}).name||''; }
   /* three absences in a row */
   var days = Object.keys(DB.attendance).sort().filter(function(k){ return k<=T; }).slice(-3);
   if(days.length===3) DB.students.forEach(function(s){
-    if(days.every(function(k){ return DB.attendance[k][s.id]==='A'; })) push('bad', 'bell', stuShort(s.id)+' \u2014 3 absences in a row', cname(s)+' \u00b7 consider a call home', 'attendance');
+    if(days.every(function(k){ return DB.attendance[k][s.id]==='A'; })) push('bad', 'bell', stuShort(s.id)+' \u2014 3 absences in a row', cname(s)+' \u00b7 consider a call home', 'attendance', s.classId);
   });
   /* at risk: an average under 60 with at least two scores behind it */
   DB.students.forEach(function(s){
     var n = 0; DB.assessments.forEach(function(a){ if(a.classId===s.classId && (DB.scores[a.id]||{})[s.id]!=null) n++; });
     var g = n>=2 ? studentAverage(s.id) : null;
-    if(g!==null && g<60) push('bad', 'chart', stuShort(s.id)+' \u2014 average '+g+'%', cname(s)+' \u00b7 below the 60% line', 'gradebook');
+    if(g!==null && g<60) push('bad', 'chart', stuShort(s.id)+' \u2014 average '+g+'%', cname(s)+' \u00b7 below the 60% line', 'gradebook', s.classId);
   });
   /* the register for a class whose period has already ended today, not taken */
   if(dow>=1 && dow<=5) DB.classes.forEach(function(c){
     var p = DB.periods.filter(function(x){ return x.n===c.period; })[0], kids = studentsIn(c.id);
     if(!p || !kids.length || nm < mins(p.end)) return;
     var day = DB.attendance[T]||{}, taken = kids.some(function(s){ return !!day[s.id]; });
-    if(!taken) push('warn', 'check', 'Register not taken \u2014 '+c.name, p.label+' ended '+fmt12(p.end), 'attendance');
+    if(!taken) push('warn', 'check', 'Register not taken \u2014 '+c.name, p.label+' ended '+fmt12(p.end), 'attendance', c.id);
   });
   /* chronic absence: a tenth or more of recorded days missed, once there are ten days to judge by */
   var allDays = Object.keys(DB.attendance).filter(function(k){ return k<=T; });
   if(allDays.length>=10) DB.students.forEach(function(s){
     var rec=0, abs=0; allDays.forEach(function(k){ var x = DB.attendance[k][s.id]; if(x){ rec++; if(x==='A') abs++; } });
-    if(rec>=10 && abs>=3 && abs/rec>=0.1 && !days.every(function(k){ return DB.attendance[k][s.id]==='A'; })) push('warn', 'users', stuShort(s.id)+' \u2014 absent '+abs+' of '+rec+' days', Math.round(abs/rec*100)+'% missed \u00b7 chronic absence line is 10%', 'attendance');
+    if(rec>=10 && abs>=3 && abs/rec>=0.1 && !days.every(function(k){ return DB.attendance[k][s.id]==='A'; })) push('warn', 'users', stuShort(s.id)+' \u2014 absent '+abs+' of '+rec+' days', Math.round(abs/rec*100)+'% missed \u00b7 chronic absence line is 10%', 'attendance', s.classId);
   });
   DB.interventions.filter(function(i){ return i.status!=='closed' && i.review && i.review < T; }).forEach(function(i){
-    push('warn', 'heart', 'Support plan review overdue \u2014 '+stuShort(i.studentId), 'was due '+fmtDay(i.review), 'support');
+    push('warn', 'heart', 'Support plan review overdue \u2014 '+stuShort(i.studentId), 'was due '+fmtDay(i.review), 'support', cidOf(i.studentId));
   });
   /* follow-ups promised to families: due today, or slipped */
   DB.contacts.filter(function(c){ return c.followUp && c.followUp <= T; }).sort(by('followUp')).forEach(function(c){
-    push('warn', 'phone', 'Follow up \u2014 '+stuShort(c.studentId), (c.who ? c.who+' \u00b7 ' : '')+(c.followUp===T ? 'due today' : 'was due '+fmtDay(c.followUp)), 'contacts');
+    push('warn', 'phone', 'Follow up \u2014 '+stuShort(c.studentId), (c.who ? c.who+' \u00b7 ' : '')+(c.followUp===T ? 'due today' : 'was due '+fmtDay(c.followUp)), 'contacts', cidOf(c.studentId));
   });
   /* tasks: what slipped, then what is due today */
   var late = DB.tasks.filter(function(t){ return !t.done && t.due && t.due < T; }), today = DB.tasks.filter(function(t){ return !t.done && t.due === T; });
@@ -1127,7 +1128,7 @@ function attentionItems(){
   DB.students.forEach(function(s){
     if(!s.birthday) return;
     var b = s.birthday.slice(5), n = daysBetween(T, T.slice(0,4)+'-'+b);
-    if(n>=0 && n<=7) push('ok', 'cake', s.first+' '+s.last+(n===0?' \u2014 birthday today':' \u2014 birthday '+fmtDay(T.slice(0,4)+'-'+b).toLowerCase()), cname(s), 'birthdays');
+    if(n>=0 && n<=7) push('ok', 'cake', s.first+' '+s.last+(n===0?' \u2014 birthday today':' \u2014 birthday '+fmtDay(T.slice(0,4)+'-'+b).toLowerCase()), cname(s), 'birthdays', s.classId);
   });
   var w = { bad:0, warn:1, ok:2 };
   out.sort(function(a,b){ return w[a.lv]-w[b.lv]; });
@@ -1165,7 +1166,7 @@ function wireClassPick(){
   el('classPick').addEventListener('click', openClassPick);
   document.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('[data-pick-class]') : null; if(!t) return;
-    DB.settings.activeClass = t.getAttribute('data-pick-class'); DB.settings._stuAll = false; DB.settings._seatSel = ''; DB.settings._seatStu = '';
+    DB.settings.activeClass = t.getAttribute('data-pick-class'); DB.settings._stuAll = false; DB.settings._seatSel = ''; DB.settings._seatStu = ''; DB.settings.dashAll = false;
     closeSheet('hostSheet'); paintStatus(); render();
     var c = activeClass(); if(c) toast(c.name+' \u00b7 '+plural(studentsIn(c.id).length,'student'));
   });
@@ -1506,7 +1507,7 @@ function paintStatus(){
 
 function blank(){
   return {
-    settings: { skin:'A', mode:'light', accent:'teal', setup:false, activeClass:'', yearStart:'', yearEnd:'',
+    settings: { skin:'A', mode:'light', accent:'teal', setup:false, dashAll:false, activeClass:'', yearStart:'', yearEnd:'',
                 gradeScale:[['A',90],['B',80],['C',70],['D',60],['F',0]], lastBackup:null },
     teacher: { name:'', first:'', school:'', role:'', room:'', email:'', phone:'' },
     periods: [
@@ -1812,30 +1813,35 @@ reg({
     var week = DB.events.filter(function(e){ var n = daysBetween(T, e.date); return n>=0 && n<=6; }).length;
     return DAYS[t.getDay()]+', '+t.getDate()+' '+MONTHS[t.getMonth()]+' · '+plural(due,'task')+' due today · '+open.length+' open · '+plural(week,'event')+' this week';
   },
-  acts: function(){ return '<button class="btn primary" data-go="planner">'+ic('plus')+'Lesson</button><button class="btn" data-go="attendance">'+ic('check')+'Attendance</button><button class="btn" data-go="notes">'+ic('note')+'Note</button>'; },
+  /* the scope switch: the figures for the class on the chip, or for everyone you teach */
+  acts: function(){ var c = activeClass(), all = !!DB.settings.dashAll;
+    return (c && DB.classes.length > 1 ? '<div class="seg" id="dashScope"><button data-dash-scope="class"'+(all?'':' class="on"')+'>'+esc(c.name)+'</button><button data-dash-scope="all"'+(all?' class="on"':'')+'>Whole school</button></div>' : '') +
+      '<button class="btn primary" data-go="planner">'+ic('plus')+'Lesson</button><button class="btn" data-go="attendance">'+ic('check')+'Attendance</button><button class="btn" data-go="notes">'+ic('note')+'Note</button>'; },
 
   cap: function(){ var t = simToday(); return DAYS[t.getDay()]+', '+t.getDate()+' '+MONTHS[t.getMonth()]; },
   render: function(){
     var v = el('v-dashboard'), T = todayIso();
     var open = DB.tasks.filter(function(t){ return !t.done; }), dueToday = open.filter(function(t){ return t.due && t.due <= T; });
-    var students = DB.students.length;
+    /* scope: the class on the chip, or everyone (the Whole school switch in the head) */
+    var sc = activeClass(), all = !!DB.settings.dashAll || !sc, kids = all ? DB.students : studentsIn(sc.id), inScope = {}; kids.forEach(function(s){ inScope[s.id] = 1; });
+    var students = kids.length;
     var att = DB.attendance[T] || {}, p=0,l=0,a=0, marked=0;
-    DB.students.forEach(function(s){ var x = att[s.id]; if(!x) return; marked++; if(x==='P') p++; else if(x==='L') l++; else if(x==='A') a++; });
+    kids.forEach(function(s){ var x = att[s.id]; if(!x) return; marked++; if(x==='P') p++; else if(x==='L') l++; else if(x==='A') a++; });
     var attRate = marked ? Math.round((p+l)/marked*100) : null;
     var week = DB.events.filter(function(e){ var n = daysBetween(T, e.date); return n>=0 && n<=6; }).length;
-    var plans = DB.interventions.filter(function(i){ return i.status!=='closed'; });
+    var plans = DB.interventions.filter(function(i){ return i.status!=='closed' && inScope[i.studentId]; });
     var overdue = plans.filter(function(i){ return i.review && i.review < T; }).length;
-    var avg = classAverageAll();
+    var avg = all ? classAverageAll() : classAverage(sc.id);
     var classesToday = schedule().filter(function(r){ return r.cls; }).length;
 
     /* every tile is a door: tap it and you land on the screen behind the number */
     function tile(kc, kc2, icon, label, value, detail, view){ return '<div class="k tile go" role="button" tabindex="0" data-go-view="'+view+'" aria-label="'+label+': open '+view+'" style="--kc:'+kc+';--kc2:'+kc2+'"><i class="ki">'+ic(icon)+'</i><div class="kt"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="d">'+detail+'</div></div></div>'; }
     var kpi = '<div class="kpi">' +
-      tile('var(--a)','var(--a2)','users','Students', students, 'across '+plural(DB.classes.length,'class','classes'), 'students') +
-      tile('var(--violet)','var(--violet2)','check','Attendance today', attRate===null?'—':attRate+'%', marked ? '<b class="bad">'+a+' absent</b> · '+l+' late' : 'not taken yet', 'attendance') +
+      tile('var(--a)','var(--a2)','users','Students', students, all ? 'across '+plural(DB.classes.length,'class','classes') : 'in '+esc(sc.name), 'students') +
+      tile('var(--violet)','var(--violet2)','check','Attendance today', attRate===null?'—':attRate+'%', marked ? '<b class="bad">'+a+' absent</b> · '+l+' late'+(all?'':' · '+esc(sc.name)) : 'not taken yet'+(all?'':' · '+esc(sc.name)), 'attendance') +
       tile('var(--bad)','var(--bad2)','check','Tasks due', dueToday.length+'<small>/ '+open.length+'</small>', 'today / open', 'tasks') +
       (skin()==='A' ? tile('var(--warm)','var(--warm2)','cal','This week', week, plural(week,'event'), 'calendar') + tile('var(--blue)','var(--blue2)','layers','Classes today', classesToday, 'on the timetable', 'classes')
-                  : tile('var(--warm)','var(--warm2)','heart','Support plans', plans.length, overdue?'<b class="warm">'+overdue+' review overdue</b>':'all reviews on time', 'support') + tile('var(--blue)','var(--blue2)','chart','Class average', avg===null?'—':avg+'%', 'across graded work', 'gradebook')) +
+                  : tile('var(--warm)','var(--warm2)','heart','Support plans', plans.length, overdue?'<b class="warm">'+overdue+' review overdue</b>':'all reviews on time', 'support') + tile('var(--blue)','var(--blue2)','chart','Class average', avg===null?'—':avg+'%', all ? 'across graded work' : esc(sc.name), 'gradebook')) +
       '</div>';
 
     /* today: the day bar (B) or the vertical timeline (A) */
@@ -1873,7 +1879,7 @@ reg({
 
     /* a birthday inside the week gets a banner of its own */
     var bday = '';
-    DB.students.forEach(function(s){ if(bday || !s.birthday) return; var n = daysBetween(T, T.slice(0,4)+'-'+s.birthday.slice(5)); if(n>=0 && n<=7){ var age = (+T.slice(0,4)) - (+s.birthday.slice(0,4)); bday = '<div class="bday"><span class="cake">\ud83c\udf82</span><div><b>'+esc(s.first+' '+s.last)+' turns '+age+(n===0?' today':' on '+fmtDay(T.slice(0,4)+'-'+s.birthday.slice(5)))+'</b><span>'+esc((cls(s.classId)||{}).name||'')+' \u00b7 plan a moment in class</span></div></div>'; } });
+    kids.slice().sort(function(a,b){ return daysBetween(T, T.slice(0,4)+'-'+(a.birthday||'2000-12-31').slice(5)) - daysBetween(T, T.slice(0,4)+'-'+(b.birthday||'2000-12-31').slice(5)); }).forEach(function(s){ if(bday || !s.birthday) return; var n = daysBetween(T, T.slice(0,4)+'-'+s.birthday.slice(5)); if(n>=0 && n<=7){ var age = (+T.slice(0,4)) - (+s.birthday.slice(0,4)); bday = '<div class="bday"><span class="cake">\ud83c\udf82</span><div><b>'+esc(s.first+' '+s.last)+' turns '+age+(n===0?' today':' on '+fmtDay(T.slice(0,4)+'-'+s.birthday.slice(5)))+'</b><span>'+esc((cls(s.classId)||{}).name||'')+' \u00b7 plan a moment in class</span></div></div>'; } });
 
     var tasks = '<section class="panel"><div class="ch"><p class="lab">Tasks</p><span class="chip"><b>'+open.length+'</b> open</span></div>' +
       (open.length ? open.slice().sort(function(a,b){ return (a.due||'9')<(b.due||'9')?-1:1; }).slice(0,6).map(function(t){
@@ -1914,7 +1920,7 @@ reg({
       }).join('')+'</tbody></table></div>' : '<p class="empty">No classes yet. <b>Add one</b> on the Classes screen.</p>') +
       '<div class="ch" style="margin-top:4px"><p class="lab">Recent</p></div>'+recentHtml()+'</section>';
 
-    var attention = '<section class="panel"><div class="ch"><p class="lab">Needs attention</p></div><div style="display:flex;flex-direction:column;gap:8px">'+alertsHtml()+'</div>' +
+    var attention = '<section class="panel"><div class="ch"><p class="lab">Needs attention'+(all?'':' \u00b7 '+esc(sc.name))+'</p></div><div style="display:flex;flex-direction:column;gap:8px">'+alertsHtml(all ? '' : sc.id)+'</div>' +
       '<div class="ch" style="margin-top:4px"><p class="lab">Coming up</p><button class="linkbtn" data-go="calendar">Calendar \u2192</button></div>' +
       (DB.events.length ? DB.events.filter(function(e){ return e.date>=T; }).sort(by('date')).slice(0,5).map(function(e){
         var d = parseD(e.date);
@@ -1941,6 +1947,8 @@ reg({
       var g = e.target.closest ? e.target.closest('[data-go]') : null;
       if(g){ if(g.getAttribute('data-class')) DB.settings.activeClass = g.getAttribute('data-class'); switchView(g.getAttribute('data-go')); return; }
       if(e.target.closest && e.target.closest('#focusPick')){ openClassPick(); return; }
+      var sg = e.target.closest ? e.target.closest('[data-dash-scope]') : null;
+      if(sg){ DB.settings.dashAll = sg.getAttribute('data-dash-scope') === 'all'; render(); return; }
       var q = e.target.closest ? e.target.closest('[data-quick]') : null;
       if(q){ var k = q.getAttribute('data-quick');
         if(k==='lesson'){ switchView('planner'); } else if(k==='attendance'){ switchView('attendance'); }
@@ -1975,8 +1983,8 @@ function recentHtml(){
   }).join('');
 }
 /* the Needs attention panel: the first six from the shared list, and a way to the rest */
-function alertsHtml(){
-  var items = attentionItems();
+function alertsHtml(cid){
+  var items = attentionItems().filter(function(it){ return !cid || !it.cid || it.cid === cid; });   /* a class in scope hides other classes' students; school-wide items stay */
   if(!items.length) return '<div class="alert ok">'+ic('check')+'<div><b>Nothing needs attention</b><span>Absences, grades slipping, overdue reviews, follow-ups, low supplies and birthdays show here.</span></div></div>';
   return items.slice(0,6).map(alertHtml).join('') + (items.length>6 ? '<button class="linkbtn" data-bell style="align-self:flex-start">See all '+items.length+' \u2192</button>' : '');
 }
