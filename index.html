@@ -533,6 +533,16 @@ table th{color:var(--faint)}
 .dcur{position:absolute;top:10px;bottom:0;width:2px;background:var(--a);z-index:2}
 .dcur:before{content:"";position:absolute;top:-4px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--a);box-shadow:0 0 0 4px var(--a2)}
 .dcur i{position:absolute;bottom:-2px;left:-18px;font-size:10px;font-weight:800;color:var(--a);background:var(--a2);padding:2px 6px;border-radius:6px;white-space:nowrap}
+.focus{background:var(--card2);border-radius:14px;padding:12px 14px}
+.fstats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.fstat{background:var(--card);border-radius:12px;padding:9px 10px;min-width:0;cursor:pointer;border:1px solid var(--hair)}
+.fstat:hover{border-color:var(--a)}
+.fstat s{text-decoration:none;display:block;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fstat b{display:block;font-size:20px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:3px}
+.fstat b small{font-size:11px;color:var(--muted);font-weight:700}
+.fstat i{font-style:normal;display:block;font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.3}
+.fstat i b{display:inline;font-size:inherit;margin:0}
+@media(max-width:480px){ .fstats{grid-template-columns:1fr 1fr} }
 .k .ki{display:none}
 .k.go{cursor:pointer;transition:transform .12s,box-shadow .12s}
 .k.go:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(0,0,0,.35)}
@@ -1750,6 +1760,16 @@ function demo(){
 .dcur{position:absolute;top:10px;bottom:0;width:2px;background:var(--a);z-index:2}
 .dcur:before{content:"";position:absolute;top:-4px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--a);box-shadow:0 0 0 4px var(--a2)}
 .dcur i{position:absolute;bottom:-2px;left:-18px;font-size:10px;font-weight:800;color:var(--a);background:var(--a2);padding:2px 6px;border-radius:6px;white-space:nowrap}
+.focus{background:var(--card2);border-radius:14px;padding:12px 14px}
+.fstats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.fstat{background:var(--card);border-radius:12px;padding:9px 10px;min-width:0;cursor:pointer;border:1px solid var(--hair)}
+.fstat:hover{border-color:var(--a)}
+.fstat s{text-decoration:none;display:block;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fstat b{display:block;font-size:20px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:3px}
+.fstat b small{font-size:11px;color:var(--muted);font-weight:700}
+.fstat i{font-style:normal;display:block;font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.3}
+.fstat i b{display:inline;font-size:inherit;margin:0}
+@media(max-width:480px){ .fstats{grid-template-columns:1fr 1fr} }
 .k .ki{display:none}
 .k.go{cursor:pointer;transition:transform .12s,box-shadow .12s}
 .k.go:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(0,0,0,.35)}
@@ -1861,11 +1881,34 @@ reg({
       }).join('') : '<p class="empty">Nothing open. <b>Add a task</b> on the Tasks screen.</p>') +
       '<button class="btn sm ghost" data-go="tasks" style="align-self:flex-start">All tasks \u2192</button></section>';
 
-    var classes = '<section class="panel"><div class="ch"><p class="lab">Classes</p><button class="linkbtn" data-go="gradebook">Gradebook \u2192</button></div>' +
-      (DB.classes.length ? '<div class="tbl"><table><thead><tr><th>Class</th><th>Graded</th><th class="r">Avg</th></tr></thead><tbody>' +
-      DB.classes.filter(function(c){ return c.period!==0; }).sort(function(a,b){ var ac = activeClass(); return (b.id===(ac&&ac.id)) - (a.id===(ac&&ac.id)); }).map(function(c){
-        var g = classGrading(c.id), av = classAverage(c.id), on = activeClass() && c.id===activeClass().id;
-        return '<tr'+(on?' style="background:var(--a2)"':'')+'><td><span class="sw" style="background:'+c.colour+'"></span> <b>'+esc(c.name)+'</b>'+(on?' <span class="tag a" style="margin-left:4px">Active</span>':'')+'<br><span class="muted small" style="padding-left:16px">'+esc(c.room)+' \u00b7 '+studentsIn(c.id).length+'</span></td>' +
+    /* the class in focus: the one on the chip. Everything the dashboard knows about it, then the rest of the timetable. */
+    var fc = activeClass(), focus = '';
+    if(fc){
+      var fkids = studentsIn(fc.id), fav = classAverage(fc.id), far = attendanceRate(fc.id), fg = classGrading(fc.id);
+      var fday = DB.attendance[T]||{}, fP=0, fA=0, fL=0, fE=0, fMarked=0; fkids.forEach(function(s){ var x = fday[s.id]; if(x){ fMarked++; if(x==='A') fA++; else if(x==='L') fL++; else if(x==='E') fE++; else fP++; } });
+      var fmiss = missingWork(fc.id).filter(function(r){ return r.n > 0; }).length;
+      var fflags = { iep:0, s504:0, ell:0, medical:0 }; fkids.forEach(function(s){ var f = s.flags||{}; if(f.iep) fflags.iep++; if(f.s504) fflags.s504++; if(f.ell) fflags.ell++; if(f.medical) fflags.medical++; });
+      var fper = DB.periods.filter(function(p){ return p.n===fc.period; })[0];
+      /* the next time this class is on: today if its period has not ended, else the next school day - and what is planned */
+      var fnext = '', fd = T, fi = 0;
+      while(fi < 8 && !fnext){ var dw = parseD(fd).getDay(); if(dw>=1 && dw<=5 && fper && (fd!==T || nowMins() < mins(fper.end))){ var e = (DB.plan[fd]||{})[fc.period], les = typeof e==='string' ? find(DB.lessons, e) : null, tt = les ? les.title : (e && e.title) || ''; fnext = (fd===T ? 'Today' : fmtDay(fd))+' '+fmt12(fper.start)+(tt ? ' \u2014 '+esc(tt) : ' \u2014 <span class="faint">nothing planned yet</span>'); } fd = addDays(fd, 1); fi++; }
+      var fflagTxt = [fflags.iep?fflags.iep+' IEP':'', fflags.s504?fflags.s504+' 504':'', fflags.ell?fflags.ell+' ELL':'', fflags.medical?fflags.medical+' medical':''].filter(Boolean).join(' \u00b7 ');
+      focus = '<div class="focus"><div class="ch"><div style="display:flex;gap:10px;align-items:center;min-width:0"><span class="avi" style="background:'+fc.colour+';width:36px;height:36px;font-size:13px">'+initials(fc.name)+'</span><div style="min-width:0"><b style="font-size:16px;display:block">'+esc(fc.name)+'</b><span class="small muted">'+esc(fc.subject||'')+(fc.room?' \u00b7 '+esc(fc.room):'')+(fper?' \u00b7 '+esc(fper.label)+' '+fmt12(fper.start):'')+' \u00b7 '+plural(fkids.length,'student')+'</span></div></div><button class="btn sm ghost" id="focusPick">Change</button></div>' +
+        '<div class="fstats">' +
+          '<div class="fstat" data-go-view="gradebook"><s>Average</s><b>'+(fav===null?'\u2014':fav+'%')+'</b><i>'+fg.pct+'% graded</i></div>' +
+          '<div class="fstat" data-go-view="attendance"><s>Attendance</s><b>'+(far===null?'\u2014':far+'%')+'</b><i>last 10 days</i></div>' +
+          '<div class="fstat" data-go-view="attendance"><s>Today</s><b>'+(fMarked?fP+fL+fE+'<small>/'+fkids.length+'</small>':'\u2014')+'</b><i>'+(fMarked?(fA?'<b class="bad">'+fA+' absent</b>':'all here')+(fL?' \u00b7 '+fL+' late':''):'not taken yet')+'</i></div>' +
+          '<div class="fstat" data-go-view="gradebook"><s>Missing</s><b>'+(fmiss||'0')+'</b><i>'+(fmiss?plural(fmiss,'student')+' behind':'nobody behind')+'</i></div>' +
+        '</div>' +
+        (fflagTxt?'<div class="small muted" style="margin-top:8px">'+ic('heart',12)+' '+fflagTxt+'</div>':'') +
+        (fnext?'<div class="small" style="margin-top:8px"><span class="muted">Next with them:</span> '+fnext+'</div>':'') +
+        '<div class="chips" style="margin-top:10px"><button class="btn sm" data-go="attendance">'+ic('check',14)+'Register</button><button class="btn sm" data-go="gradebook">'+ic('chart',14)+'Gradebook</button><button class="btn sm" data-go="seating">'+ic('seat',14)+'Seating</button><button class="btn sm" data-go="students">'+ic('users',14)+'Students</button></div></div>';
+    }
+    var classes = '<section class="panel"><div class="ch"><p class="lab">'+(fc?'In focus':'Classes')+'</p><button class="linkbtn" data-go="classes">All classes \u2192</button></div>' + focus +
+      (DB.classes.length ? '<div class="ch" style="margin-top:12px"><p class="lab">'+(fc?'Everyone else':'Classes')+'</p></div><div class="tbl"><table><thead><tr><th>Class</th><th>Graded</th><th class="r">Avg</th></tr></thead><tbody>' +
+      DB.classes.filter(function(c){ return c.period!==0 && !(fc && c.id===fc.id); }).map(function(c){
+        var g = classGrading(c.id), av = classAverage(c.id);
+        return '<tr data-pick-class="'+c.id+'" style="cursor:pointer" title="Put '+esc(c.name)+' in focus"><td><span class="sw" style="background:'+c.colour+'"></span> <b>'+esc(c.name)+'</b><br><span class="muted small" style="padding-left:16px">'+esc(c.room)+' \u00b7 '+studentsIn(c.id).length+'</span></td>' +
           '<td style="min-width:90px"><span class="small muted">'+g.pct+'% of '+plural(g.assessments,'assessment')+'</span><div class="bar" style="margin-top:4px"><i style="width:'+g.pct+'%;background:'+c.colour+'"></i></div></td>' +
           '<td class="r"><span class="g" style="color:'+(av!==null&&av<70?'var(--warm)':'var(--ink)')+'">'+(av===null?'\u2014':av+'%')+'</span></td></tr>';
       }).join('')+'</tbody></table></div>' : '<p class="empty">No classes yet. <b>Add one</b> on the Classes screen.</p>') +
@@ -1897,6 +1940,7 @@ reg({
       if(!e.target.closest || !(e.target.closest('#v-dashboard') || e.target.closest('#viewActs'))) return;
       var g = e.target.closest ? e.target.closest('[data-go]') : null;
       if(g){ if(g.getAttribute('data-class')) DB.settings.activeClass = g.getAttribute('data-class'); switchView(g.getAttribute('data-go')); return; }
+      if(e.target.closest && e.target.closest('#focusPick')){ openClassPick(); return; }
       var q = e.target.closest ? e.target.closest('[data-quick]') : null;
       if(q){ var k = q.getAttribute('data-quick');
         if(k==='lesson'){ switchView('planner'); } else if(k==='attendance'){ switchView('attendance'); }
