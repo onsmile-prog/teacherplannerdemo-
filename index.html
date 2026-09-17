@@ -524,6 +524,9 @@ table th{color:var(--faint)}
 .dcur:before{content:"";position:absolute;top:-4px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--a);box-shadow:0 0 0 4px var(--a2)}
 .dcur i{position:absolute;bottom:-2px;left:-18px;font-size:10px;font-weight:800;color:var(--a);background:var(--a2);padding:2px 6px;border-radius:6px;white-space:nowrap}
 .k .ki{display:none}
+.k.go{cursor:pointer;transition:transform .12s,box-shadow .12s}
+.k.go:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(0,0,0,.35)}
+.k.go:active{transform:translateY(0)}
 [data-skin="A"] .k.tile{display:flex;gap:12px;align-items:center}
 [data-skin="A"] .k .ki{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:var(--kc2,var(--a2));color:var(--kc,var(--a));flex-shrink:0}
 [data-skin="A"] .k .ki svg{width:18px;height:18px}
@@ -1159,6 +1162,12 @@ function wireGo(){
     var then = t.getAttribute('data-then'); switchView(t.getAttribute('data-go-view'));
     if(then) setTimeout(function(){ var b = el(then); if(b) b.click(); }, 60);
   });
+  /* keyboard: Enter or Space on a tile/alert that is a button */
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    var t = e.target.closest ? e.target.closest('[data-go-view][role=button]') : null; if(!t) return;
+    e.preventDefault(); t.click();
+  });
 }
 function wireAsk(){
   el('askYes').addEventListener('click', function(){ var f = ASK; ASK = null; closeSheet('askSheet'); el('askNo').hidden = false; if(f) f(); });
@@ -1587,14 +1596,15 @@ function demo(){
     s.attendance[day] = {};
     s.students.forEach(function(x, i){
       var v = 'P';
-      if(leo && x.id===leo.id && k>=-2) v = 'A';   /* only the dashboard's Leo, not every Leo in the school */
-      else if(x.id==='s15' && (k===-9 || k===-6 || k===-4 || k===-1)) v = 'A';   /* four of ten days: the chronic-absence alert */
+      if(x.id==='s15' && (k===-9 || k===-6 || k===-4 || k===-1)) v = 'A';   /* four of ten days: the chronic-absence alert */
       else if((i*13+k)%29===0) v = 'A';
       else if((i*7+k)%23===0) v = 'L';
       else if((i*5+k)%41===0) v = 'E';
       s.attendance[day][x.id] = v;
     });
   }
+  /* the dashboard's Leo (only him) misses the last three SCHOOL days - whatever weekday "today" is */
+  if(leo) Object.keys(s.attendance).sort().slice(-3).forEach(function(day){ s.attendance[day][leo.id] = 'A'; });
   /* assessments + scores */
   var asg = [
     ['a1','c1','Circuits quiz','cat_quiz',20,d(-8)], ['a2','c1','Lab report — bulbs','cat_hw',25,d(-3)], ['a3','c1','Energy test','cat_test',100,d(-1)],
@@ -1695,6 +1705,9 @@ function demo(){
 .dcur:before{content:"";position:absolute;top:-4px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--a);box-shadow:0 0 0 4px var(--a2)}
 .dcur i{position:absolute;bottom:-2px;left:-18px;font-size:10px;font-weight:800;color:var(--a);background:var(--a2);padding:2px 6px;border-radius:6px;white-space:nowrap}
 .k .ki{display:none}
+.k.go{cursor:pointer;transition:transform .12s,box-shadow .12s}
+.k.go:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(0,0,0,.35)}
+.k.go:active{transform:translateY(0)}
 [data-skin="A"] .k.tile{display:flex;gap:12px;align-items:center}
 [data-skin="A"] .k .ki{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:var(--kc2,var(--a2));color:var(--kc,var(--a));flex-shrink:0}
 [data-skin="A"] .k .ki svg{width:18px;height:18px}
@@ -1749,13 +1762,14 @@ reg({
     var avg = classAverageAll();
     var classesToday = schedule().filter(function(r){ return r.cls; }).length;
 
-    function tile(kc, kc2, icon, label, value, detail){ return '<div class="k tile" style="--kc:'+kc+';--kc2:'+kc2+'"><i class="ki">'+ic(icon)+'</i><div class="kt"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="d">'+detail+'</div></div></div>'; }
+    /* every tile is a door: tap it and you land on the screen behind the number */
+    function tile(kc, kc2, icon, label, value, detail, view){ return '<div class="k tile go" role="button" tabindex="0" data-go-view="'+view+'" aria-label="'+label+': open '+view+'" style="--kc:'+kc+';--kc2:'+kc2+'"><i class="ki">'+ic(icon)+'</i><div class="kt"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="d">'+detail+'</div></div></div>'; }
     var kpi = '<div class="kpi">' +
-      tile('var(--a)','var(--a2)','users','Students', students, 'across '+plural(DB.classes.length,'class','classes')) +
-      tile('var(--violet)','var(--violet2)','check','Attendance today', attRate===null?'—':attRate+'%', marked ? '<b class="bad">'+a+' absent</b> · '+l+' late' : 'not taken yet') +
-      tile('var(--bad)','var(--bad2)','check','Tasks due', dueToday.length+'<small>/ '+open.length+'</small>', 'today / open') +
-      (skin()==='A' ? tile('var(--warm)','var(--warm2)','cal','This week', week, plural(week,'event')) + tile('var(--blue)','var(--blue2)','layers','Classes today', classesToday, 'on the timetable')
-                  : tile('var(--warm)','var(--warm2)','heart','Support plans', plans.length, overdue?'<b class="warm">'+overdue+' review overdue</b>':'all reviews on time') + tile('var(--blue)','var(--blue2)','chart','Class average', avg===null?'—':avg+'%', 'across graded work')) +
+      tile('var(--a)','var(--a2)','users','Students', students, 'across '+plural(DB.classes.length,'class','classes'), 'students') +
+      tile('var(--violet)','var(--violet2)','check','Attendance today', attRate===null?'—':attRate+'%', marked ? '<b class="bad">'+a+' absent</b> · '+l+' late' : 'not taken yet', 'attendance') +
+      tile('var(--bad)','var(--bad2)','check','Tasks due', dueToday.length+'<small>/ '+open.length+'</small>', 'today / open', 'tasks') +
+      (skin()==='A' ? tile('var(--warm)','var(--warm2)','cal','This week', week, plural(week,'event'), 'calendar') + tile('var(--blue)','var(--blue2)','layers','Classes today', classesToday, 'on the timetable', 'classes')
+                  : tile('var(--warm)','var(--warm2)','heart','Support plans', plans.length, overdue?'<b class="warm">'+overdue+' review overdue</b>':'all reviews on time', 'support') + tile('var(--blue)','var(--blue2)','chart','Class average', avg===null?'—':avg+'%', 'across graded work', 'gradebook')) +
       '</div>';
 
     /* today: the day bar (B) or the vertical timeline (A) */
